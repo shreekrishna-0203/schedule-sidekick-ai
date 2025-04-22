@@ -36,7 +36,6 @@ const ChatInterface: React.FC = () => {
     attendees: string;
     description?: string;
   } | null>(null);
-  const [hasApiError, setHasApiError] = useState(false);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -151,11 +150,6 @@ const ChatInterface: React.FC = () => {
       
       console.log("Received response:", data);
       
-      // Reset API error state if we got a successful response
-      if (hasApiError) {
-        setHasApiError(false);
-      }
-      
       // Add AI response
       const aiResponse: ChatMessage = {
         id: uuidv4(),
@@ -181,33 +175,19 @@ const ChatInterface: React.FC = () => {
     } catch (error: any) {
       console.error('Error:', error);
       
-      // Check if it's an API quota error from the error message
-      const isQuotaError = error.message?.includes('quota') || error.message?.includes('rate limit');
-      
-      if (isQuotaError) {
-        setHasApiError(true);
-      }
-      
       // Add a fallback message when the AI service is unavailable
-      const errorContent = isQuotaError 
-        ? "I'm sorry, but my AI service has reached its quota limit. The administrator needs to check the OpenAI account billing status. In the meantime, I can still help with basic calendar operations."
-        : "I'm having trouble connecting to my backend services right now. Please try again in a moment.";
-      
       const errorMessage: ChatMessage = {
         id: uuidv4(),
-        content: errorContent,
+        content: "I'm having trouble connecting to my backend services right now. Please try again in a moment.",
         role: "assistant",
         timestamp: new Date(),
       };
       
       setMessages(prev => [...prev, errorMessage]);
       
-      // Show appropriate toast based on error type
       toast({
-        title: isQuotaError ? "AI Service Quota Exceeded" : "Connection Error",
-        description: isQuotaError 
-          ? "The OpenAI API quota has been exceeded. Please check your billing details in the OpenAI dashboard."
-          : "Failed to get a response from the assistant. Please check your internet connection and try again.",
+        title: "Connection Error",
+        description: "Failed to get a response from the assistant. Please check your internet connection and try again.",
         variant: "destructive",
       });
     } finally {
@@ -290,20 +270,6 @@ const ChatInterface: React.FC = () => {
                   <div className="w-2 h-2 bg-primary rounded-full"></div>
                   <div className="w-2 h-2 bg-primary rounded-full"></div>
                   <div className="w-2 h-2 bg-primary rounded-full"></div>
-                </div>
-              )}
-              {hasApiError && !isLoading && (
-                <div className="bg-amber-100 dark:bg-amber-900 p-3 rounded-md text-sm mt-4">
-                  <p className="font-medium">OpenAI API Quota Exceeded</p>
-                  <p className="mt-1">The OpenAI API quota has been exceeded. The administrator needs to check the OpenAI account billing status or upgrade the plan.</p>
-                  <a 
-                    href="https://platform.openai.com/account/billing/overview" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-600 dark:text-blue-400 underline mt-2 inline-block"
-                  >
-                    Check OpenAI Billing
-                  </a>
                 </div>
               )}
             </div>

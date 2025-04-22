@@ -33,7 +33,7 @@ const Dashboard = () => {
               <CardHeader className="pb-2">
                 <CardTitle>Welcome to ScheduleSidekick</CardTitle>
                 <CardDescription>
-                  Your AI assistant for smart scheduling and calendar management
+                  Your custom scheduling assistant for calendar management
                 </CardDescription>
               </CardHeader>
               <CardContent>

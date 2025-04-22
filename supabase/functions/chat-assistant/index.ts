@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -6,7 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const API_KEY = Deno.env.get('OPENAI_API_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
 
@@ -107,21 +107,72 @@ function formatMeetingTime(startTime: string, endTime: string) {
   return `${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
 }
 
-// Fallback responses when AI is unavailable
-function getFallbackResponse(intent: string, params: Record<string, any> = {}): string {
+// Custom AI implementation
+function generateAIResponse(intent: string, params: Record<string, any> = {}, meetings: any[] = []): string {
+  const currentDate = new Date();
+  const dateString = currentDate.toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+  const timeString = currentDate.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
   switch(intent) {
     case 'create_event':
-      return "I understand you want to create an event. Please provide details like title, date, and time.";
+      const dateHint = params.dateHint || 'tomorrow';
+      const timeHint = params.timeHint || 'in the morning';
+      const title = params.title || 'your event';
+      
+      return `I'd be happy to help you schedule ${title}. I see you want it ${dateHint} ${timeHint}. Let me set that up for you. Can you confirm this works for you, or would you like to adjust any details?`;
+    
     case 'list_events':
-      if (params.period === 'today') {
-        return "You requested to see your events for today. Please check your calendar tab for a complete view.";
-      } else if (params.period === 'tomorrow') {
-        return "You asked about tomorrow's events. Please check your calendar tab for a complete view.";
+      if (meetings.length === 0) {
+        const periodText = params.period === 'today' 
+          ? 'today' 
+          : params.period === 'tomorrow' 
+            ? 'tomorrow' 
+            : 'this week';
+        return `Looking at your calendar, you don't have any events scheduled for ${periodText}. Your schedule is clear!`;
       } else {
-        return "You requested to see your upcoming events. Please check your calendar tab for a complete view.";
+        const periodText = params.period === 'today' 
+          ? 'today' 
+          : params.period === 'tomorrow' 
+            ? 'tomorrow' 
+            : 'this week';
+        let response = `Here's what you have scheduled for ${periodText}:\n\n`;
+        
+        meetings.forEach((meeting: any, index: number) => {
+          response += `${index + 1}. "${meeting.title}" at ${meeting.time} on ${new Date(meeting.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}\n`;
+        });
+        
+        return response;
       }
+    
     default:
-      return "I'm here to help with your scheduling needs. You can ask me to create meetings or check your calendar.";
+      // Handle general queries with contextual responses
+      const query = params.query?.toLowerCase() || '';
+      
+      if (query.includes('hello') || query.includes('hi')) {
+        return `Hello! I'm your scheduling assistant. Today is ${dateString} and the current time is ${timeString}. How can I help you with your calendar today?`;
+      } else if (query.includes('time')) {
+        return `The current time is ${timeString} on ${dateString}.`;
+      } else if (query.includes('weather')) {
+        return `I'm a scheduling assistant and don't have access to current weather data. I can help you manage your calendar though!`;
+      } else if (query.includes('help')) {
+        return `I can help you manage your schedule! You can ask me to:
+- Schedule meetings or events
+- Show your calendar for today, tomorrow, or this week
+- Check specific time slots
+- Manage your appointments
+
+Just let me know what you need!`;
+      } else {
+        return `I'm your scheduling assistant, ready to help with your calendar! You can ask me to schedule meetings, check your agenda, or manage your events. What would you like to do today?`;
+      }
   }
 }
 
@@ -165,7 +216,7 @@ serve(async (req) => {
     console.log(`Detected intent: ${intent}`, params);
     
     // Process based on intent
-    let aiPrompt = '';
+    let aiResponse = '';
     let calendarData = null;
     
     if (intent === 'list_events') {
@@ -176,16 +227,13 @@ serve(async (req) => {
         startTime = getToday();
         endTime = new Date(startTime);
         endTime.setHours(23, 59, 59, 999);
-        aiPrompt = "The user wants to know their events for today. ";
       } else if (params.period === 'tomorrow') {
         startTime = getTomorrow();
         endTime = new Date(startTime);
         endTime.setHours(23, 59, 59, 999);
-        aiPrompt = "The user wants to know their events for tomorrow. ";
       } else { // default to this week
         startTime = getToday();
         endTime = getEndOfWeek();
-        aiPrompt = "The user wants to know their events for this week. ";
       }
       
       // Query user's meetings within the time range
@@ -205,7 +253,7 @@ serve(async (req) => {
       }
       
       if (meetings && meetings.length > 0) {
-        // Format meetings for the AI to describe
+        // Format meetings for response
         const formattedMeetings = meetings.map(m => ({
           title: m.title,
           time: formatMeetingTime(m.start_time, m.end_time),
@@ -219,9 +267,9 @@ serve(async (req) => {
           period: params.period || 'this week'
         };
         
-        aiPrompt += `Here are the meetings: ${JSON.stringify(formattedMeetings)}. Summarize these events in a friendly way. If there are no events, mention that the calendar is clear.`;
+        aiResponse = generateAIResponse(intent, params, formattedMeetings);
       } else {
-        aiPrompt += `The user has no events scheduled ${params.period || 'this week'}. Let them know their calendar is clear.`;
+        aiResponse = generateAIResponse(intent, params, []);
         calendarData = {
           intent: 'list_events',
           meetings: [],
@@ -229,102 +277,26 @@ serve(async (req) => {
         };
       }
     } else if (intent === 'create_event') {
-      aiPrompt = `The user wants to create a calendar event. They mentioned: "${message}". Ask them for any missing details (title, date, time, duration) to schedule the event. If they provided enough details in their message, confirm you'll create the event with those details.`;
+      aiResponse = generateAIResponse(intent, params);
       calendarData = {
         intent: 'create_event',
         proposedDetails: params
       };
     } else {
-      // For regular queries, just pass the message to the AI
-      aiPrompt = `The user asked: "${message}". Respond as a helpful calendar and scheduling assistant.`;
+      // For regular queries, generate a response based on the message
+      params.query = message;
+      aiResponse = generateAIResponse('query', params);
     }
 
-    // Check if OpenAI API key is available
-    if (!API_KEY) {
-      console.error("OpenAI API key is not available");
-      return new Response(
-        JSON.stringify({ 
-          response: "I apologize, but my AI capabilities are currently unavailable. Please try again later or contact support.",
-          calendarData: null
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    console.log("AI response generated successfully");
 
-    console.log("Calling OpenAI API");
-    
-    // Call OpenAI API
-    try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are an AI scheduling assistant named ScheduleSidekick. Help users manage their calendar and events. Keep responses concise and friendly. If users want to schedule something, ask for all the details you need in a conversational way.'
-            },
-            {
-              role: 'user',
-              content: aiPrompt
-            }
-          ],
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("OpenAI API error:", errorData);
-        
-        // Check if this is a quota exceeded error
-        const isQuotaError = errorData?.error?.code === 'insufficient_quota' || 
-                             errorData?.error?.type === 'insufficient_quota' ||
-                             (errorData?.error?.message && errorData.error.message.includes('quota'));
-        
-        if (isQuotaError) {
-          throw new Error('OpenAI API quota exceeded. Please check billing details.');
-        }
-        
-        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const aiResponse = data.choices[0].message.content;
-
-      console.log("AI response generated successfully");
-
-      return new Response(
-        JSON.stringify({ 
-          response: aiResponse, 
-          calendarData: calendarData 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } catch (error) {
-      console.error("Error calling OpenAI API:", error);
-      
-      // Provide a fallback response based on intent
-      const fallbackResponse = getFallbackResponse(intent, params);
-      
-      // Check if this is a quota error
-      const isQuotaError = error.message && error.message.includes('quota');
-      const errorResponse = isQuotaError 
-        ? "I apologize, but my AI service has reached its quota limit. The administrator needs to check the OpenAI account billing status. In the meantime, I can still help with basic calendar operations." 
-        : fallbackResponse;
-      
-      return new Response(
-        JSON.stringify({ 
-          response: errorResponse,
-          calendarData: calendarData,
-          error: { type: isQuotaError ? 'quota_exceeded' : 'api_error', message: error.message }
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    return new Response(
+      JSON.stringify({ 
+        response: aiResponse, 
+        calendarData: calendarData 
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
     console.error('General error:', error);
     return new Response(
