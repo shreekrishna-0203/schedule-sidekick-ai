@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/integrations/supabase/client";
 import EventModal from "../calendar/EventModal";
 import { addDays, format, parse, parseISO } from "date-fns";
+import { Send, Mic, MicOff } from "lucide-react";
 
 const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -24,6 +25,7 @@ const ChatInterface: React.FC = () => {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -36,6 +38,9 @@ const ChatInterface: React.FC = () => {
     attendees: string;
     description?: string;
   } | null>(null);
+  
+  // Reference for speech recognition
+  const recognitionRef = useRef<any>(null);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -52,7 +57,68 @@ const ChatInterface: React.FC = () => {
     if (inputRef.current) {
       inputRef.current.focus();
     }
-  }, []);
+    
+    // Initialize speech recognition if available
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(prev => prev + ' ' + transcript);
+      };
+      
+      recognitionRef.current.onerror = () => {
+        setIsRecording(false);
+        toast({
+          title: "Speech Recognition Error",
+          description: "There was an error with speech recognition. Please try again or type your message.",
+          variant: "destructive",
+        });
+      };
+      
+      recognitionRef.current.onend = () => {
+        setIsRecording(false);
+      };
+    }
+    
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, [toast]);
+
+  // Function to toggle speech recognition
+  const toggleSpeechRecognition = () => {
+    if (!recognitionRef.current) {
+      toast({
+        title: "Speech Recognition Not Available",
+        description: "Your browser doesn't support speech recognition. Please type your message.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (isRecording) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    } else {
+      try {
+        recognitionRef.current.start();
+        setIsRecording(true);
+      } catch (error) {
+        console.error("Speech recognition error:", error);
+        toast({
+          title: "Speech Recognition Error",
+          description: "There was an error starting speech recognition. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
 
   // Function to parse a date hint from the AI response
   const parseEventDate = (dateHint: string): Date => {
@@ -131,6 +197,15 @@ const ChatInterface: React.FC = () => {
     try {
       console.log("Sending message to edge function...");
       
+      // Add typing indicator
+      const typingId = uuidv4();
+      setMessages(prev => [...prev, {
+        id: typingId,
+        content: "...",
+        role: "assistant-typing",
+        timestamp: new Date(),
+      }]);
+      
       // Call our Supabase Edge Function for AI processing
       const { data, error } = await supabase.functions.invoke('chat-assistant', {
         body: { 
@@ -149,6 +224,9 @@ const ChatInterface: React.FC = () => {
       }
       
       console.log("Received response:", data);
+      
+      // Remove typing indicator
+      setMessages(prev => prev.filter(msg => msg.id !== typingId));
       
       // Add AI response
       const aiResponse: ChatMessage = {
@@ -183,6 +261,7 @@ const ChatInterface: React.FC = () => {
         timestamp: new Date(),
       };
       
+      setMessages(prev => prev.filter(msg => msg.role !== "assistant-typing"));
       setMessages(prev => [...prev, errorMessage]);
       
       toast({
@@ -265,7 +344,7 @@ const ChatInterface: React.FC = () => {
               {messages.map((message) => (
                 <ChatMessageComponent key={message.id} message={message} />
               ))}
-              {isLoading && (
+              {isLoading && !messages.some(m => m.role === "assistant-typing") && (
                 <div className="flex items-center space-x-2 animate-pulse">
                   <div className="w-2 h-2 bg-primary rounded-full"></div>
                   <div className="w-2 h-2 bg-primary rounded-full"></div>
@@ -286,25 +365,22 @@ const ChatInterface: React.FC = () => {
                 onKeyDown={handleKeyDown}
                 disabled={isLoading}
               />
+              {/* Voice input button */}
+              <Button 
+                onClick={toggleSpeechRecognition} 
+                variant="outline"
+                size="icon"
+                disabled={isLoading}
+                className={isRecording ? "bg-red-100 dark:bg-red-900" : ""}
+              >
+                {isRecording ? <MicOff /> : <Mic />}
+              </Button>
               <Button 
                 onClick={handleSendMessage} 
                 disabled={!input.trim() || isLoading}
                 size="icon"
               >
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  width="24" 
-                  height="24" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round"
-                >
-                  <path d="m22 2-7 20-4-9-9-4Z"/>
-                  <path d="M22 2 11 13"/>
-                </svg>
+                <Send />
               </Button>
             </div>
           </div>

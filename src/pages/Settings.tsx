@@ -3,17 +3,55 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import Time from "@/components/Time";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sun, Moon, Bell, BellOff, Globe, Info, Mail, Phone, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTheme } from "next-themes";
+import { useToast } from "@/hooks/use-toast";
 
 const SettingsPage = () => {
   const [emailNotif, setEmailNotif] = useState(true);
   const [pushNotif, setPushNotif] = useState(true);
   const [language, setLanguage] = useState("en");
   const { setTheme, resolvedTheme } = useTheme();
+  const { toast } = useToast();
+  const [timezone, setTimezone] = useState<string>("");
+
+  useEffect(() => {
+    // Get the user's timezone
+    try {
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      setTimezone(userTimezone);
+    } catch (e) {
+      setTimezone("Unknown");
+    }
+  }, []);
+
+  const handleLanguageChange = (newLang: string) => {
+    setLanguage(newLang);
+    toast({
+      title: "Language Updated",
+      description: `Language has been changed to ${newLang === "en" ? "English" : 
+                    newLang === "es" ? "Spanish" : 
+                    newLang === "fr" ? "French" : 
+                    newLang === "de" ? "German" : 
+                    newLang === "hi" ? "Hindi" : "Chinese"}`,
+    });
+  };
+
+  const handleNotificationToggle = (type: "email" | "push", value: boolean) => {
+    if (type === "email") {
+      setEmailNotif(value);
+    } else {
+      setPushNotif(value);
+    }
+    
+    toast({
+      title: `${type === "email" ? "Email" : "Push"} Notifications ${value ? "Enabled" : "Disabled"}`,
+      description: `You will ${value ? "now" : "no longer"} receive ${type} notifications.`,
+    });
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 pb-12 pt-8">
@@ -31,7 +69,7 @@ const SettingsPage = () => {
               <Globe className="w-5 h-5 text-muted-foreground" />
               <Label className="font-semibold">Language</Label>
             </div>
-            <Select value={language} onValueChange={setLanguage}>
+            <Select value={language} onValueChange={handleLanguageChange}>
               <SelectTrigger className="max-w-xs">
                 <SelectValue placeholder="Pick language" />
               </SelectTrigger>
@@ -84,13 +122,23 @@ const SettingsPage = () => {
             </div>
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-3">
-                <Switch id="emailNotif" checked={emailNotif} onCheckedChange={setEmailNotif} />
+                <Switch id="emailNotif" checked={emailNotif} onCheckedChange={(value) => handleNotificationToggle("email", value)} />
                 <Label htmlFor="emailNotif">Email notifications</Label>
               </div>
               <div className="flex items-center gap-3">
-                <Switch id="pushNotif" checked={pushNotif} onCheckedChange={setPushNotif} />
+                <Switch id="pushNotif" checked={pushNotif} onCheckedChange={(value) => handleNotificationToggle("push", value)} />
                 <Label htmlFor="pushNotif">Push notifications</Label>
               </div>
+            </div>
+          </section>
+          <section>
+            <div className="flex items-center gap-2 mb-2">
+              <Globe className="w-5 h-5 text-muted-foreground" />
+              <Label className="font-semibold">Time Zone</Label>
+            </div>
+            <div className="text-sm pl-6 text-muted-foreground">
+              <p>Your current time zone is: <span className="font-mono">{timezone}</span></p>
+              <p className="text-xs mt-1">Time zone is automatically detected from your browser.</p>
             </div>
           </section>
           <section>

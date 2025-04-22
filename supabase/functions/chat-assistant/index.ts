@@ -107,7 +107,7 @@ function formatMeetingTime(startTime: string, endTime: string) {
   return `${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
 }
 
-// Custom AI implementation
+// Enhanced AI response generator with more conversational and contextual awareness
 function generateAIResponse(intent: string, params: Record<string, any> = {}, meetings: any[] = []): string {
   const currentDate = new Date();
   const dateString = currentDate.toLocaleDateString('en-US', { 
@@ -121,13 +121,38 @@ function generateAIResponse(intent: string, params: Record<string, any> = {}, me
     minute: '2-digit'
   });
 
+  // Advanced conversational patterns for more natural responses
+  const greetings = [
+    "Hello there! ",
+    "Hi! ",
+    "Greetings! ",
+    "Hey! "
+  ];
+  
+  const confirmations = [
+    "I'd be happy to help with that. ",
+    "I can definitely assist you with this. ",
+    "Let me take care of that for you. ",
+    "Sure thing! "
+  ];
+  
+  const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+  const randomConfirmation = confirmations[Math.floor(Math.random() * confirmations.length)];
+  
+  // Process different intent types with more natural language
   switch(intent) {
     case 'create_event':
       const dateHint = params.dateHint || 'tomorrow';
       const timeHint = params.timeHint || 'in the morning';
       const title = params.title || 'your event';
       
-      return `I'd be happy to help you schedule ${title}. I see you want it ${dateHint} ${timeHint}. Let me set that up for you. Can you confirm this works for you, or would you like to adjust any details?`;
+      const eventResponses = [
+        `${randomConfirmation}I'll set up ${title} for ${dateHint} ${timeHint}. Would you like to add any specific details to this event?`,
+        `I'll schedule "${title}" ${dateHint} ${timeHint} for you. Is there anything else you'd like to add to this event?`,
+        `I'm creating an event called "${title}" for ${dateHint} ${timeHint}. Would you like to add any attendees or other details?`
+      ];
+      
+      return eventResponses[Math.floor(Math.random() * eventResponses.length)];
     
     case 'list_events':
       if (meetings.length === 0) {
@@ -136,42 +161,79 @@ function generateAIResponse(intent: string, params: Record<string, any> = {}, me
           : params.period === 'tomorrow' 
             ? 'tomorrow' 
             : 'this week';
-        return `Looking at your calendar, you don't have any events scheduled for ${periodText}. Your schedule is clear!`;
+            
+        const emptyCalendarResponses = [
+          `I've checked your calendar, and you have no events scheduled for ${periodText}. Your schedule is clear!`,
+          `Good news! Your calendar is completely free ${periodText}.`,
+          `Looking at your calendar, I don't see any events scheduled for ${periodText}.`
+        ];
+        
+        return emptyCalendarResponses[Math.floor(Math.random() * emptyCalendarResponses.length)];
       } else {
         const periodText = params.period === 'today' 
           ? 'today' 
           : params.period === 'tomorrow' 
             ? 'tomorrow' 
             : 'this week';
+            
         let response = `Here's what you have scheduled for ${periodText}:\n\n`;
         
         meetings.forEach((meeting: any, index: number) => {
           response += `${index + 1}. "${meeting.title}" at ${meeting.time} on ${new Date(meeting.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}\n`;
         });
         
-        return response;
+        const busyDayResponses = [
+          `\nLooks like you've got ${meetings.length > 1 ? 'some events' : 'an event'} coming up. Anything else you'd like to know about your schedule?`,
+          `\nThat's your agenda for ${periodText}. Would you like me to add another event or check a different day?`,
+          `\nIs there anything specific about these events you'd like to know more about?`
+        ];
+        
+        return response + busyDayResponses[Math.floor(Math.random() * busyDayResponses.length)];
       }
     
     default:
       // Handle general queries with contextual responses
       const query = params.query?.toLowerCase() || '';
       
-      if (query.includes('hello') || query.includes('hi')) {
-        return `Hello! I'm your scheduling assistant. Today is ${dateString} and the current time is ${timeString}. How can I help you with your calendar today?`;
+      if (query.includes('hello') || query.includes('hi') || query.includes('hey')) {
+        const timeBasedGreetings = [
+          `${randomGreeting}I'm your scheduling assistant. Today is ${dateString} and the current time is ${timeString}. How can I help you with your schedule today?`,
+          `${randomGreeting}It's ${timeString} on ${dateString}. How can I assist with your calendar today?`,
+          `${randomGreeting}Nice to chat with you! It's currently ${timeString}. What can I help you with regarding your schedule?`
+        ];
+        
+        return timeBasedGreetings[Math.floor(Math.random() * timeBasedGreetings.length)];
       } else if (query.includes('time')) {
-        return `The current time is ${timeString} on ${dateString}.`;
+        return `The current time is ${timeString} on ${dateString}. Is there something specific you'd like to schedule at this time?`;
       } else if (query.includes('weather')) {
-        return `I'm a scheduling assistant and don't have access to current weather data. I can help you manage your calendar though!`;
+        return `I'm your scheduling assistant and don't have access to real-time weather data. But I can help you manage your calendar! Would you like to check your schedule or create a new event?`;
       } else if (query.includes('help')) {
-        return `I can help you manage your schedule! You can ask me to:
+        return `I'd be happy to help! I can:
 - Schedule meetings or events
 - Show your calendar for today, tomorrow, or this week
 - Check specific time slots
-- Manage your appointments
+- Help manage your appointments
 
-Just let me know what you need!`;
+Just let me know what you need, and I'll assist you right away!`;
+      } else if (query.includes('thank')) {
+        const thankResponses = [
+          "You're welcome! Is there anything else I can help you with regarding your schedule?",
+          "Happy to help! Let me know if you need any other assistance with your calendar.",
+          "Anytime! I'm here whenever you need help managing your schedule."
+        ];
+        
+        return thankResponses[Math.floor(Math.random() * thankResponses.length)];
+      } else if (query.includes('who are you') || query.includes('what can you do')) {
+        return `I'm your scheduling assistant, designed to help manage your calendar efficiently. I can create events, check your schedule, and help you stay organized. What would you like help with today?`;
       } else {
-        return `I'm your scheduling assistant, ready to help with your calendar! You can ask me to schedule meetings, check your agenda, or manage your events. What would you like to do today?`;
+        // General fallback responses with conversation starters
+        const fallbackResponses = [
+          `I'm your scheduling assistant, ready to help! You can ask me to schedule meetings, check your calendar, or manage your events. What would you like to do today?`,
+          `Hi there! I can help you manage your schedule. Would you like to create a new event, check your existing schedule, or do something else with your calendar?`,
+          `I'm here to assist with your scheduling needs. You can ask me to set up meetings, view your calendar, or help organize your day. How can I help you today?`
+        ];
+        
+        return fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
       }
   }
 }
