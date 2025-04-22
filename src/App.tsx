@@ -11,6 +11,9 @@ import SignUp from "./pages/auth/SignUp";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
+import Contact from "./pages/Contact";
 
 const queryClient = new QueryClient();
 
@@ -23,16 +26,21 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
-            
+
             {/* Auth routes */}
             <Route path="/auth/sign-in" element={<SignIn />} />
             <Route path="/auth/sign-up" element={<SignUp />} />
             <Route path="/auth/forgot-password" element={<ForgotPassword />} />
-            
+
             {/* App routes */}
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<Profile />} />
-            
+
+            {/* Legal pages */}
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/contact" element={<Contact />} />
+
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
