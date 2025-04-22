@@ -93,11 +93,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Auth functions
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-    const { error, data } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    if (!data.session?.user) throw new Error("No user session found");
-    setUser(await fetchProfile(data.session.user.id, email));
-    setIsLoading(false);
+    try {
+      const { error, data } = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (!data.session?.user) throw new Error("No user session found");
+      
+      setUser(await fetchProfile(data.session.user.id, email));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const signup = async (email: string, password: string, name: string) => {

@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const formSchema = z.object({
   email: z.string().email({
@@ -27,6 +29,7 @@ const SignIn = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -39,18 +42,26 @@ const SignIn = () => {
   const onSubmit = async (data: FormData) => {
     try {
       setIsLoading(true);
+      setError(null);
       await login(data.email, data.password);
       toast({
         title: "Sign in successful",
         description: "Welcome back to ScheduleSidekick!",
       });
       navigate("/dashboard");
-    } catch (error) {
-      toast({
-        title: "Sign in failed",
-        description: "Please check your credentials and try again.",
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      console.error("Sign in error:", error);
+      
+      // Handle specific Supabase errors
+      if (error.message?.includes("Email not confirmed")) {
+        setError("Your email has not been confirmed. Please check your inbox for a confirmation email or request a new one.");
+      } else {
+        toast({
+          title: "Sign in failed",
+          description: "Please check your credentials and try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -69,6 +80,12 @@ const SignIn = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
