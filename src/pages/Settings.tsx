@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Time from "@/components/Time";
 import { Switch } from "@/components/ui/switch";
@@ -6,7 +5,6 @@ import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 import { Sun, Moon, Bell, BellOff, Globe, Info, Mail, Phone, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTheme } from "next-themes";
 import { useToast } from "@/hooks/use-toast";
 
@@ -21,10 +19,6 @@ const SettingsPage = () => {
     return saved ? JSON.parse(saved) : true;
   });
   
-  const [language, setLanguage] = useState(() => {
-    const saved = localStorage.getItem("language");
-    return saved || "en";
-  });
   
   const { setTheme, resolvedTheme, theme } = useTheme();
   const { toast } = useToast();
@@ -49,29 +43,9 @@ const SettingsPage = () => {
   const handleThemeChange = (newTheme: string) => {
     setTheme(newTheme);
     localStorage.setItem("theme", newTheme);
-    
     toast({
       title: "Theme Updated",
       description: `Theme has been changed to ${newTheme.charAt(0).toUpperCase() + newTheme.slice(1)}`,
-    });
-  };
-
-  const handleLanguageChange = (newLang: string) => {
-    setLanguage(newLang);
-    localStorage.setItem("language", newLang);
-    
-    const languageNames: Record<string, string> = {
-      en: "English",
-      es: "Spanish",
-      fr: "French",
-      de: "German",
-      hi: "Hindi",
-      zh: "Chinese"
-    };
-    
-    toast({
-      title: "Language Updated",
-      description: `Language has been changed to ${languageNames[newLang] || newLang}`,
     });
   };
 
@@ -103,25 +77,6 @@ const SettingsPage = () => {
         <CardContent className="space-y-6">
           <section>
             <div className="flex items-center gap-2 mb-2">
-              <Globe className="w-5 h-5 text-muted-foreground" />
-              <Label className="font-semibold">Language</Label>
-            </div>
-            <Select value={language} onValueChange={handleLanguageChange}>
-              <SelectTrigger className="max-w-xs">
-                <SelectValue placeholder="Pick language" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="en">English</SelectItem>
-                <SelectItem value="es">Spanish</SelectItem>
-                <SelectItem value="fr">French</SelectItem>
-                <SelectItem value="de">German</SelectItem>
-                <SelectItem value="hi">Hindi</SelectItem>
-                <SelectItem value="zh">Chinese</SelectItem>
-              </SelectContent>
-            </Select>
-          </section>
-          <section>
-            <div className="flex items-center gap-2 mb-2">
               {resolvedTheme === "dark" ? <Moon className="w-5 h-5 text-muted-foreground" /> : <Sun className="w-5 h-5 text-muted-foreground" />}
               <Label className="font-semibold">Theme</Label>
             </div>
@@ -130,6 +85,7 @@ const SettingsPage = () => {
                 variant={theme === "light" ? "default" : "outline"}
                 onClick={() => handleThemeChange("light")}
                 size="sm"
+                type="button"
               >
                 <Sun className="w-4 h-4 mr-1" />
                 Light
@@ -138,6 +94,7 @@ const SettingsPage = () => {
                 variant={theme === "dark" ? "default" : "outline"}
                 onClick={() => handleThemeChange("dark")}
                 size="sm"
+                type="button"
               >
                 <Moon className="w-4 h-4 mr-1" />
                 Dark
@@ -146,6 +103,7 @@ const SettingsPage = () => {
                 variant={theme === "system" ? "default" : "outline"}
                 onClick={() => handleThemeChange("system")}
                 size="sm"
+                type="button"
               >
                 <Globe className="w-4 h-4 mr-1" />
                 System
