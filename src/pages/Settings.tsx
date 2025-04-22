@@ -11,10 +11,22 @@ import { useTheme } from "next-themes";
 import { useToast } from "@/hooks/use-toast";
 
 const SettingsPage = () => {
-  const [emailNotif, setEmailNotif] = useState(true);
-  const [pushNotif, setPushNotif] = useState(true);
-  const [language, setLanguage] = useState("en");
-  const { setTheme, resolvedTheme } = useTheme();
+  const [emailNotif, setEmailNotif] = useState(() => {
+    const saved = localStorage.getItem("emailNotifications");
+    return saved ? JSON.parse(saved) : true;
+  });
+  
+  const [pushNotif, setPushNotif] = useState(() => {
+    const saved = localStorage.getItem("pushNotifications");
+    return saved ? JSON.parse(saved) : true;
+  });
+  
+  const [language, setLanguage] = useState(() => {
+    const saved = localStorage.getItem("language");
+    return saved || "en";
+  });
+  
+  const { setTheme, resolvedTheme, theme } = useTheme();
   const { toast } = useToast();
   const [timezone, setTimezone] = useState<string>("");
 
@@ -26,25 +38,50 @@ const SettingsPage = () => {
     } catch (e) {
       setTimezone("Unknown");
     }
-  }, []);
+    
+    // Apply saved theme if it exists
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
+  }, [setTheme]);
+
+  const handleThemeChange = (newTheme: string) => {
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    
+    toast({
+      title: "Theme Updated",
+      description: `Theme has been changed to ${newTheme.charAt(0).toUpperCase() + newTheme.slice(1)}`,
+    });
+  };
 
   const handleLanguageChange = (newLang: string) => {
     setLanguage(newLang);
+    localStorage.setItem("language", newLang);
+    
+    const languageNames: Record<string, string> = {
+      en: "English",
+      es: "Spanish",
+      fr: "French",
+      de: "German",
+      hi: "Hindi",
+      zh: "Chinese"
+    };
+    
     toast({
       title: "Language Updated",
-      description: `Language has been changed to ${newLang === "en" ? "English" : 
-                    newLang === "es" ? "Spanish" : 
-                    newLang === "fr" ? "French" : 
-                    newLang === "de" ? "German" : 
-                    newLang === "hi" ? "Hindi" : "Chinese"}`,
+      description: `Language has been changed to ${languageNames[newLang] || newLang}`,
     });
   };
 
   const handleNotificationToggle = (type: "email" | "push", value: boolean) => {
     if (type === "email") {
       setEmailNotif(value);
+      localStorage.setItem("emailNotifications", JSON.stringify(value));
     } else {
       setPushNotif(value);
+      localStorage.setItem("pushNotifications", JSON.stringify(value));
     }
     
     toast({
@@ -90,24 +127,24 @@ const SettingsPage = () => {
             </div>
             <div className="flex gap-2">
               <Button
-                variant={resolvedTheme === "light" ? "default" : "outline"}
-                onClick={() => setTheme("light")}
+                variant={theme === "light" ? "default" : "outline"}
+                onClick={() => handleThemeChange("light")}
                 size="sm"
               >
                 <Sun className="w-4 h-4 mr-1" />
                 Light
               </Button>
               <Button
-                variant={resolvedTheme === "dark" ? "default" : "outline"}
-                onClick={() => setTheme("dark")}
+                variant={theme === "dark" ? "default" : "outline"}
+                onClick={() => handleThemeChange("dark")}
                 size="sm"
               >
                 <Moon className="w-4 h-4 mr-1" />
                 Dark
               </Button>
               <Button
-                variant={resolvedTheme === "system" ? "default" : "outline"}
-                onClick={() => setTheme("system")}
+                variant={theme === "system" ? "default" : "outline"}
+                onClick={() => handleThemeChange("system")}
                 size="sm"
               >
                 <Globe className="w-4 h-4 mr-1" />
