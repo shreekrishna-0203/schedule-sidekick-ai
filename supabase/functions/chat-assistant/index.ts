@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -106,6 +105,24 @@ function formatMeetingTime(startTime: string, endTime: string) {
   const start = new Date(startTime);
   const end = new Date(endTime);
   return `${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+}
+
+// Fallback responses when AI is unavailable
+function getFallbackResponse(intent: string, params: Record<string, any> = {}): string {
+  switch(intent) {
+    case 'create_event':
+      return "I understand you want to create an event. Please provide details like title, date, and time.";
+    case 'list_events':
+      if (params.period === 'today') {
+        return "You requested to see your events for today. Please check your calendar tab for a complete view.";
+      } else if (params.period === 'tomorrow') {
+        return "You asked about tomorrow's events. Please check your calendar tab for a complete view.";
+      } else {
+        return "You requested to see your upcoming events. Please check your calendar tab for a complete view.";
+      }
+    default:
+      return "I'm here to help with your scheduling needs. You can ask me to create meetings or check your calendar.";
+  }
 }
 
 serve(async (req) => {
@@ -262,6 +279,16 @@ serve(async (req) => {
       if (!response.ok) {
         const errorData = await response.json();
         console.error("OpenAI API error:", errorData);
+        
+        // Check if this is a quota exceeded error
+        const isQuotaError = errorData?.error?.code === 'insufficient_quota' || 
+                             errorData?.error?.type === 'insufficient_quota' ||
+                             (errorData?.error?.message && errorData.error.message.includes('quota'));
+        
+        if (isQuotaError) {
+          throw new Error('OpenAI API quota exceeded. Please check billing details.');
+        }
+        
         throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
       }
 
@@ -279,10 +306,21 @@ serve(async (req) => {
       );
     } catch (error) {
       console.error("Error calling OpenAI API:", error);
+      
+      // Provide a fallback response based on intent
+      const fallbackResponse = getFallbackResponse(intent, params);
+      
+      // Check if this is a quota error
+      const isQuotaError = error.message && error.message.includes('quota');
+      const errorResponse = isQuotaError 
+        ? "I apologize, but my AI service has reached its quota limit. The administrator needs to check the OpenAI account billing status. In the meantime, I can still help with basic calendar operations." 
+        : fallbackResponse;
+      
       return new Response(
         JSON.stringify({ 
-          response: "I apologize, but I'm having trouble generating a response right now. Please try again in a moment.",
-          calendarData: null
+          response: errorResponse,
+          calendarData: calendarData,
+          error: { type: isQuotaError ? 'quota_exceeded' : 'api_error', message: error.message }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -290,7 +328,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('General error:', error);
     return new Response(
-      JSON.stringify({ error: 'An unexpected error occurred' }),
+      JSON.stringify({ 
+        error: 'An unexpected error occurred',
+        response: "I'm sorry, but something went wrong. Please try again later."
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
