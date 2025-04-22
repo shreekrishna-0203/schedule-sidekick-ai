@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,14 +10,14 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const Profile = () => {
-  const { user } = useAuth();
+  const { user, setUserProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  
-  // Form state for user preferences
+
   const [preferences, setPreferences] = useState({
     timeZone: user?.preferences.timeZone || "America/New_York",
     workingHours: {
@@ -32,23 +31,47 @@ const Profile = () => {
       preferAfternoons: user?.preferences.meetingPreferences.preferAfternoons || false,
     },
     notifications: {
-      email: true,
-      push: true,
+      email: user?.preferences.notifications.email ?? true,
+      push: user?.preferences.notifications.push ?? true,
       reminderTime: user?.preferences.notifications.reminderTime || 15,
     }
   });
+  const [name, setName] = useState(user?.name || "");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
-  const handleSavePreferences = () => {
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const filePath = `${user.id}/${Math.random()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      await setUserProfile({ avatar_url: filePath });
+      toast({ title: "Avatar updated" });
+    } catch (error: any) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleSavePreferences = async () => {
     setIsLoading(true);
-    
-    // Simulate saving to backend
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      await setUserProfile({ name });
       toast({
         title: "Preferences saved",
         description: "Your scheduling preferences have been updated.",
       });
-    }, 1000);
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+      refreshProfile();
+    }
   };
 
   return (
@@ -76,13 +99,24 @@ const Profile = () => {
                     </div>
                   )}
                 </div>
-                <Button variant="outline" size="sm">Change avatar</Button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  ref={fileInputRef}
+                  onChange={handleAvatarChange}
+                  disabled={uploadingAvatar}
+                  aria-label="Change avatar"
+                />
+                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploadingAvatar}>
+                  {uploadingAvatar ? "Uploading..." : "Change avatar"}
+                </Button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">Name</Label>
-                  <Input id="name" defaultValue={user?.name} />
+                  <Input id="name" value={name} onChange={e => setName(e.target.value)} />
                 </div>
                 <div>
                   <Label htmlFor="email">Email</Label>
