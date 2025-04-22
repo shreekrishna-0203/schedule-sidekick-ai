@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,8 +10,49 @@ import { useAuth } from "@/context/AuthContext";
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/integrations/supabase/client";
 import EventModal from "../calendar/EventModal";
-import { addDays, format, parse, parseISO } from "date-fns";
+import { addDays, format } from "date-fns";
 import { Send, Mic, MicOff } from "lucide-react";
+
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  readonly length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+  isFinal?: boolean;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onerror: (event: Event) => void;
+  onend: (event: Event) => void;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognition;
+    webkitSpeechRecognition?: new () => SpeechRecognition;
+  }
+}
 
 const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -39,10 +79,8 @@ const ChatInterface: React.FC = () => {
     description?: string;
   } | null>(null);
   
-  // Reference for speech recognition
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
@@ -52,36 +90,36 @@ const ChatInterface: React.FC = () => {
     }
   }, [messages]);
 
-  // Focus input when component mounts
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.focus();
     }
     
-    // Initialize speech recognition if available
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      
-      recognitionRef.current.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(prev => prev + ' ' + transcript);
-      };
-      
-      recognitionRef.current.onerror = () => {
-        setIsRecording(false);
-        toast({
-          title: "Speech Recognition Error",
-          description: "There was an error with speech recognition. Please try again or type your message.",
-          variant: "destructive",
-        });
-      };
-      
-      recognitionRef.current.onend = () => {
-        setIsRecording(false);
-      };
+      const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognitionConstructor) {
+        recognitionRef.current = new SpeechRecognitionConstructor();
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.interimResults = false;
+        
+        recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
+          const transcript = event.results[0][0].transcript;
+          setInput(prev => prev + ' ' + transcript);
+        };
+        
+        recognitionRef.current.onerror = () => {
+          setIsRecording(false);
+          toast({
+            title: "Speech Recognition Error",
+            description: "There was an error with speech recognition. Please try again or type your message.",
+            variant: "destructive",
+          });
+        };
+        
+        recognitionRef.current.onend = () => {
+          setIsRecording(false);
+        };
+      }
     }
     
     return () => {
@@ -91,7 +129,6 @@ const ChatInterface: React.FC = () => {
     };
   }, [toast]);
 
-  // Function to toggle speech recognition
   const toggleSpeechRecognition = () => {
     if (!recognitionRef.current) {
       toast({
@@ -120,10 +157,9 @@ const ChatInterface: React.FC = () => {
     }
   };
 
-  // Function to parse a date hint from the AI response
   const parseEventDate = (dateHint: string): Date => {
     const today = new Date();
-    today.setHours(9, 0, 0, 0); // Default to 9 AM
+    today.setHours(9, 0, 0, 0);
     
     const lowercaseHint = dateHint.toLowerCase();
     
@@ -135,7 +171,6 @@ const ChatInterface: React.FC = () => {
       return today;
     }
     
-    // Handle day of week mentions
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     for (let i = 0; i < days.length; i++) {
       if (lowercaseHint.includes(days[i])) {
@@ -146,27 +181,23 @@ const ChatInterface: React.FC = () => {
       }
     }
     
-    // Default to tomorrow if we can't parse it
     return addDays(today, 1);
   };
-  
-  // Function to suggest event details based on AI response
+
   const suggestEventDetails = (calendarData: any) => {
     if (!calendarData || calendarData.intent !== 'create_event') return null;
     
     const details = calendarData.proposedDetails;
     const startTime = new Date();
-    startTime.setHours(9, 0, 0, 0); // Default to 9 AM
+    startTime.setHours(9, 0, 0, 0);
     
     if (details.dateHint) {
       const suggestedDate = parseEventDate(details.dateHint);
       startTime.setFullYear(suggestedDate.getFullYear(), suggestedDate.getMonth(), suggestedDate.getDate());
     } else {
-      // Default to tomorrow if no date provided
       startTime.setDate(startTime.getDate() + 1);
     }
     
-    // Set default end time to 1 hour after start
     const endTime = new Date(startTime);
     endTime.setHours(startTime.getHours() + 1);
     
@@ -182,7 +213,6 @@ const ChatInterface: React.FC = () => {
   const handleSendMessage = async () => {
     if (!input.trim() || !user) return;
     
-    // Add user message
     const userMessage: ChatMessage = {
       id: uuidv4(),
       content: input,
@@ -197,7 +227,6 @@ const ChatInterface: React.FC = () => {
     try {
       console.log("Sending message to edge function...");
       
-      // Add typing indicator
       const typingId = uuidv4();
       setMessages(prev => [...prev, {
         id: typingId,
@@ -206,7 +235,6 @@ const ChatInterface: React.FC = () => {
         timestamp: new Date(),
       }]);
       
-      // Call our Supabase Edge Function for AI processing
       const { data, error } = await supabase.functions.invoke('chat-assistant', {
         body: { 
           message: input, 
@@ -225,10 +253,8 @@ const ChatInterface: React.FC = () => {
       
       console.log("Received response:", data);
       
-      // Remove typing indicator
       setMessages(prev => prev.filter(msg => msg.id !== typingId));
       
-      // Add AI response
       const aiResponse: ChatMessage = {
         id: uuidv4(),
         content: data.response,
@@ -238,14 +264,12 @@ const ChatInterface: React.FC = () => {
       
       setMessages(prev => [...prev, aiResponse]);
       
-      // Handle calendar operations if present in the response
       if (data.calendarData) {
         console.log("Calendar data:", data.calendarData);
         if (data.calendarData.intent === 'create_event') {
           const suggestedEvent = suggestEventDetails(data.calendarData);
           if (suggestedEvent) {
             setEventDetails(suggestedEvent);
-            // Add a small delay to let the user read the AI response first
             setTimeout(() => setShowEventModal(true), 500);
           }
         }
@@ -253,7 +277,6 @@ const ChatInterface: React.FC = () => {
     } catch (error: any) {
       console.error('Error:', error);
       
-      // Add a fallback message when the AI service is unavailable
       const errorMessage: ChatMessage = {
         id: uuidv4(),
         content: "I'm having trouble connecting to my backend services right now. Please try again in a moment.",
@@ -291,7 +314,6 @@ const ChatInterface: React.FC = () => {
     location?: string;
   }) => {
     try {
-      // Save the event to Supabase
       const { error } = await supabase.from("meetings").insert({
         user_id: user?.id,
         title: event.title,
@@ -311,7 +333,6 @@ const ChatInterface: React.FC = () => {
 
       setShowEventModal(false);
       
-      // Add a confirmation message from the assistant
       const confirmMessage: ChatMessage = {
         id: uuidv4(),
         content: `I've added "${event.title}" to your calendar for ${format(event.startTime, 'EEEE, MMMM d')} at ${format(event.startTime, 'h:mm a')}. Is there anything else you'd like me to help you with?`,
@@ -365,7 +386,6 @@ const ChatInterface: React.FC = () => {
                 onKeyDown={handleKeyDown}
                 disabled={isLoading}
               />
-              {/* Voice input button */}
               <Button 
                 onClick={toggleSpeechRecognition} 
                 variant="outline"
