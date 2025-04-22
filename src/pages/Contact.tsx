@@ -1,6 +1,6 @@
-
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Mail, Contact as ContactIcon } from "lucide-react";
+import Time from "@/components/Time";
 
 const Contact = () => {
   return (
@@ -17,6 +17,7 @@ const Contact = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-base">
+          <Time />
           <div className="flex items-center space-x-3">
             <Mail size={20} />
             <span className="break-words">skhebbarkd799@gmail.com</span>

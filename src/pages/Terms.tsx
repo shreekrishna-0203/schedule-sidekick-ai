@@ -1,5 +1,5 @@
-
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import Time from "@/components/Time";
 
 const Terms = () => {
   return (
@@ -10,6 +10,7 @@ const Terms = () => {
           <CardDescription>The rules for using ScheduleSidekick.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <Time />
           <p>
             By using ScheduleSidekick, you agree to use the app in accordance with all applicable laws and regulations. 
           </p>

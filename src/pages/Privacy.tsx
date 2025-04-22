@@ -1,5 +1,5 @@
-
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import Time from "@/components/Time";
 
 const Privacy = () => {
   return (
@@ -10,6 +10,7 @@ const Privacy = () => {
           <CardDescription>How we handle your information at ScheduleSidekick.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <Time />
           <p>
             Your privacy is important to us. ScheduleSidekick does not share your personal data with third parties except as required for providing our services, such as scheduling features. 
           </p>

@@ -14,6 +14,8 @@ import Profile from "./pages/Profile";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Contact from "./pages/Contact";
+import Settings from "./pages/Settings";
+import Demo from "./pages/Demo";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +37,8 @@ const App = () => (
             {/* App routes */}
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/demo" element={<Demo />} />
 
             {/* Legal pages */}
             <Route path="/privacy" element={<Privacy />} />
