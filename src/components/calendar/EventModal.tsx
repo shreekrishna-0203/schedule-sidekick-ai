@@ -4,6 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export interface EventModalProps {
   open: boolean;
@@ -14,6 +16,8 @@ export interface EventModalProps {
     endTime: Date;
     attendees: string;
     description?: string;
+    isVirtual?: boolean;
+    location?: string;
   }) => void;
   date: Date | undefined;
   isLoading?: boolean;
@@ -25,6 +29,8 @@ const EventModal: React.FC<EventModalProps> = ({ open, onClose, onSave, date, is
   const [end, setEnd] = useState<string>(date ? `${date.toISOString().slice(0, 10)}T10:00` : "");
   const [attendees, setAttendees] = useState("");
   const [description, setDescription] = useState("");
+  const [isVirtual, setIsVirtual] = useState(false);
+  const [location, setLocation] = useState("");
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,24 +41,32 @@ const EventModal: React.FC<EventModalProps> = ({ open, onClose, onSave, date, is
       endTime: new Date(end),
       attendees,
       description,
+      isVirtual,
+      location: isVirtual ? "" : location,
     });
   };
 
   React.useEffect(() => {
     if (open && date) {
-      setStart(`${date.toISOString().slice(0, 10)}T09:00`);
-      setEnd(`${date.toISOString().slice(0, 10)}T10:00`);
+      setStart(`${date.toISOString().slice(0, 10)}T${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`);
+      
+      // Set end time 1 hour after start by default
+      const endDate = new Date(date);
+      endDate.setHours(endDate.getHours() + 1);
+      setEnd(`${endDate.toISOString().slice(0, 10)}T${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}`);
     }
     if (!open) {
       setTitle("");
       setAttendees("");
       setDescription("");
+      setIsVirtual(false);
+      setLocation("");
     }
   }, [open, date]);
 
   return (
     <Dialog open={open} onOpenChange={open ? onClose : undefined}>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Add Event</DialogTitle>
         </DialogHeader>
@@ -77,8 +91,18 @@ const EventModal: React.FC<EventModalProps> = ({ open, onClose, onSave, date, is
           </div>
           <div>
             <Label htmlFor="event-description">Description</Label>
-            <Input id="event-description" value={description} onChange={e => setDescription(e.target.value)} />
+            <Textarea id="event-description" value={description} onChange={e => setDescription(e.target.value)} className="resize-none min-h-[80px]" />
           </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox id="is-virtual" checked={isVirtual} onCheckedChange={(checked) => setIsVirtual(checked === true)} />
+            <Label htmlFor="is-virtual" className="cursor-pointer">Virtual meeting</Label>
+          </div>
+          {!isVirtual && (
+            <div>
+              <Label htmlFor="event-location">Location</Label>
+              <Input id="event-location" value={location} onChange={e => setLocation(e.target.value)} placeholder="Meeting location" />
+            </div>
+          )}
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={onClose} disabled={isLoading}>Cancel</Button>
             <Button type="submit" disabled={isLoading}>{isLoading ? "Saving..." : "Save"}</Button>
