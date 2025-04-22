@@ -129,14 +129,26 @@ const ChatInterface: React.FC = () => {
     setIsLoading(true);
     
     try {
+      console.log("Sending message to edge function...");
+      
       // Call our Supabase Edge Function for AI processing
       const { data, error } = await supabase.functions.invoke('chat-assistant', {
-        body: { message: input, userId: user.id }
+        body: { 
+          message: input, 
+          userId: user.id 
+        }
       });
       
       if (error) {
-        throw new Error(error.message);
+        console.error("Edge function error:", error);
+        throw new Error(`Edge function error: ${error.message}`);
       }
+      
+      if (!data) {
+        throw new Error("No data returned from Edge Function");
+      }
+      
+      console.log("Received response:", data);
       
       // Add AI response
       const aiResponse: ChatMessage = {
@@ -150,6 +162,7 @@ const ChatInterface: React.FC = () => {
       
       // Handle calendar operations if present in the response
       if (data.calendarData) {
+        console.log("Calendar data:", data.calendarData);
         if (data.calendarData.intent === 'create_event') {
           const suggestedEvent = suggestEventDetails(data.calendarData);
           if (suggestedEvent) {
@@ -161,9 +174,20 @@ const ChatInterface: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Error:', error);
+      
+      // Add a fallback message when the AI service is unavailable
+      const errorMessage: ChatMessage = {
+        id: uuidv4(),
+        content: "I'm having trouble connecting to my backend services right now. Please try again in a moment.",
+        role: "assistant",
+        timestamp: new Date(),
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+      
       toast({
-        title: "Error",
-        description: "Failed to get a response. Please try again.",
+        title: "Connection Error",
+        description: "Failed to get a response from the assistant. Please check your internet connection and try again.",
         variant: "destructive",
       });
     } finally {
@@ -184,6 +208,8 @@ const ChatInterface: React.FC = () => {
     endTime: Date;
     attendees: string;
     description?: string;
+    isVirtual?: boolean;
+    location?: string;
   }) => {
     try {
       // Save the event to Supabase

@@ -115,7 +115,21 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId } = await req.json();
+    console.log("Edge function received request");
+    
+    // Parse the request body
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      console.error("Error parsing request body:", e);
+      return new Response(
+        JSON.stringify({ error: 'Failed to parse request body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const { message, userId } = body;
 
     if (!message) {
       return new Response(
@@ -124,11 +138,14 @@ serve(async (req) => {
       );
     }
 
+    console.log(`Processing message from user ${userId}: "${message}"`);
+
     // Create Supabase client
     const supabase = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!);
 
     // Detect the user's intent
     const { intent, params } = detectIntent(message);
+    console.log(`Detected intent: ${intent}`, params);
     
     // Process based on intent
     let aiPrompt = '';
@@ -205,40 +222,73 @@ serve(async (req) => {
       aiPrompt = `The user asked: "${message}". Respond as a helpful calendar and scheduling assistant.`;
     }
 
+    // Check if OpenAI API key is available
+    if (!API_KEY) {
+      console.error("OpenAI API key is not available");
+      return new Response(
+        JSON.stringify({ 
+          response: "I apologize, but my AI capabilities are currently unavailable. Please try again later or contact support.",
+          calendarData: null
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log("Calling OpenAI API");
+    
     // Call OpenAI API
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an AI scheduling assistant named ScheduleSidekick. Help users manage their calendar and events. Keep responses concise and friendly. If users want to schedule something, ask for all the details you need in a conversational way.'
-          },
-          {
-            role: 'user',
-            content: aiPrompt
-          }
-        ],
-      }),
-    });
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an AI scheduling assistant named ScheduleSidekick. Help users manage their calendar and events. Keep responses concise and friendly. If users want to schedule something, ask for all the details you need in a conversational way.'
+            },
+            {
+              role: 'user',
+              content: aiPrompt
+            }
+          ],
+        }),
+      });
 
-    const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("OpenAI API error:", errorData);
+        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+      }
 
-    return new Response(
-      JSON.stringify({ 
-        response: aiResponse, 
-        calendarData: calendarData 
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+      const data = await response.json();
+      const aiResponse = data.choices[0].message.content;
+
+      console.log("AI response generated successfully");
+
+      return new Response(
+        JSON.stringify({ 
+          response: aiResponse, 
+          calendarData: calendarData 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (error) {
+      console.error("Error calling OpenAI API:", error);
+      return new Response(
+        JSON.stringify({ 
+          response: "I apologize, but I'm having trouble generating a response right now. Please try again in a moment.",
+          calendarData: null
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
   } catch (error) {
-    console.error('Error:', error);
+    console.error('General error:', error);
     return new Response(
       JSON.stringify({ error: 'An unexpected error occurred' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
