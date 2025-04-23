@@ -11,7 +11,9 @@ import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/integrations/supabase/client";
 import EventModal from "../calendar/EventModal";
 import { addDays, format } from "date-fns";
-import { Send, Mic, MicOff } from "lucide-react";
+import { Send, Mic, MicOff, Calendar } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useNavigate } from "react-router-dom";
 
 interface SpeechRecognitionEvent extends Event {
   results: SpeechRecognitionResultList;
@@ -26,7 +28,6 @@ interface SpeechRecognitionResultList {
 interface SpeechRecognitionResult {
   readonly length: number;
   item(index: number): SpeechRecognitionAlternative;
-  [index: number]: SpeechRecognitionAlternative;
   isFinal?: boolean;
 }
 
@@ -55,10 +56,11 @@ declare global {
 }
 
 const ChatInterface: React.FC = () => {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
-      content: "Hi there! I'm your scheduling assistant. How can I help you today?",
+      content: "Hello! I'm your scheduling agent. I can help you manage your calendar, set up meetings, and organize your schedule. What would you like me to help you with today?",
       role: "assistant",
       timestamp: new Date(),
     },
@@ -78,6 +80,7 @@ const ChatInterface: React.FC = () => {
     attendees: string;
     description?: string;
   } | null>(null);
+  const isMobile = useIsMobile();
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -279,7 +282,7 @@ const ChatInterface: React.FC = () => {
       
       const errorMessage: ChatMessage = {
         id: uuidv4(),
-        content: "I'm having trouble connecting to my backend services right now. Please try again in a moment.",
+        content: "I'm having trouble connecting right now. Please try again in a moment.",
         role: "assistant",
         timestamp: new Date(),
       };
@@ -326,7 +329,8 @@ const ChatInterface: React.FC = () => {
               .map(a => a.trim())
               .filter(Boolean)
           : [],
-        is_virtual: false,
+        is_virtual: event.isVirtual || false,
+        location: event.location,
       });
 
       if (error) throw error;
@@ -381,27 +385,57 @@ const ChatInterface: React.FC = () => {
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Type your message..."
+                placeholder="Tell me what to schedule..."
                 className="flex-1 min-h-[60px] resize-none"
                 onKeyDown={handleKeyDown}
                 disabled={isLoading}
               />
-              <Button 
-                onClick={toggleSpeechRecognition} 
-                variant="outline"
-                size="icon"
-                disabled={isLoading}
-                className={isRecording ? "bg-red-100 dark:bg-red-900" : ""}
-              >
-                {isRecording ? <MicOff /> : <Mic />}
-              </Button>
+              {!isMobile && (
+                <Button 
+                  onClick={toggleSpeechRecognition} 
+                  variant="outline"
+                  size="icon"
+                  disabled={isLoading}
+                  className={isRecording ? "bg-primary/10" : ""}
+                  title="Voice input"
+                >
+                  {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </Button>
+              )}
               <Button 
                 onClick={handleSendMessage} 
                 disabled={!input.trim() || isLoading}
                 size="icon"
+                title="Send message"
               >
-                <Send />
+                <Send className="w-4 h-4" />
               </Button>
+            </div>
+            {isMobile && (
+              <div className="mt-2 flex gap-2">
+                <Button
+                  onClick={toggleSpeechRecognition}
+                  variant="outline"
+                  size="sm"
+                  disabled={isLoading}
+                  className={`w-full ${isRecording ? "bg-primary/10" : ""}`}
+                >
+                  {isRecording ? <MicOff className="w-4 h-4 mr-2" /> : <Mic className="w-4 h-4 mr-2" />}
+                  {isRecording ? "Stop recording" : "Voice input"}
+                </Button>
+                <Button
+                  onClick={() => navigate('/dashboard')}
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                >
+                  <Calendar className="w-4 h-4 mr-2" />
+                  View Calendar
+                </Button>
+              </div>
+            )}
+            <div className="mt-2 text-xs text-muted-foreground text-center">
+              Try saying: "Schedule a meeting with John tomorrow at 2pm" or "Set up a team call for next Monday"
             </div>
           </div>
         </CardContent>

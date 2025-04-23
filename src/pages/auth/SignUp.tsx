@@ -10,6 +10,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -34,6 +37,8 @@ const SignUp = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -46,20 +51,23 @@ const SignUp = () => {
   });
 
   const onSubmit = async (data: FormData) => {
+    setError(null);
+    setIsLoading(true);
+    
     try {
-      setIsLoading(true);
-      await signup(data.email, data.password, data.name);
-      toast({
-        title: "Account created",
-        description: "Welcome to ScheduleSidekick! Your account has been created successfully.",
-      });
-      navigate("/dashboard");
-    } catch (error) {
-      toast({
-        title: "Sign up failed",
-        description: "An error occurred. Please try again.",
-        variant: "destructive",
-      });
+      const result = await signup(data.email, data.password, data.name);
+      
+      if (result.success) {
+        if (result.error === "Email already registered") {
+          setError("This email is already registered. Please use a different email or log in.");
+          return;
+        }
+        navigate("/dashboard");
+      } else {
+        setError(result.error || "An unexpected error occurred during signup.");
+      }
+    } catch (error: any) {
+      setError(error.message || "An unexpected error occurred.");
     } finally {
       setIsLoading(false);
     }
@@ -67,7 +75,7 @@ const SignUp = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-md">
+      <div className={`w-full ${isMobile ? "px-4" : "max-w-md"}`}>
         <Card className="border-border shadow-lg">
           <CardHeader className="space-y-1 text-center">
             <CardTitle className="text-2xl font-bold tracking-tight">
@@ -78,6 +86,13 @@ const SignUp = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
@@ -150,7 +165,7 @@ const SignUp = () => {
                 </div>
               </div>
 
-              <div className="mt-4 flex gap-2">
+              <div className={`mt-4 ${isMobile ? "flex flex-col gap-2" : "flex gap-2"}`}>
                 <Button variant="outline" className="w-full" disabled={isLoading}>
                   <svg className="mr-2 h-4 w-4" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                     <path d="M15.5453 6.69044H8.02199V9.76389H12.3323C12.0155 11.3081 10.7734 12.3509 8.8861 12.8354V15.5807H12.1732C14.3205 14.0917 15.5453 10.9172 15.5453 6.69044Z"/>
