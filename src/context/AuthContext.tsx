@@ -119,11 +119,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signup = async (email: string, password: string, name: string) => {
     setIsLoading(true);
     try {
-      // Check if the email is already registered
-      const { data: existingUsers } = await supabase
+      // Check if the email is already registered by querying auth.users directly
+      const { data: existingUsers, error: queryError } = await supabase
         .from("profiles")
         .select("id")
-        .eq("email", email);
+        .eq("name", email);
+      
+      if (queryError) {
+        throw queryError;
+      }
       
       if (existingUsers && existingUsers.length > 0) {
         setIsLoading(false);
